@@ -1,0 +1,117 @@
+﻿@page "/"
+@inject NavigationManager Navigation
+@attribute [StreamRendering]
+
+<div class="hero">
+    <div class="hero-content">
+        <h1>Welcome to MTG Project</h1>
+        <p>Your ultimate tool for managing your Magic: The Gathering collection.</p>
+        <button @onclick="GoToCards">Explore Cards</button>
+    </div>
+</div>
+
+<div class="info-section">
+    <h2>About This Website</h2>
+    <p>
+        This platform is designed for Magic: The Gathering enthusiasts to browse, search, and manage their favorite cards.
+        Whether you're building your deck or just admiring card artwork, this is your one-stop destination.
+    </p>
+    <ul>
+        <li>🃏 Browse and search thousands of MTG cards</li>
+        <li>⭐ Add cards to your personal favorites collection</li>
+        <li>🔍 View detailed card information</li>
+        <li>🔐 Secure login and signup system</li>
+    </ul>
+</div>
+
+
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        background-color: #f4f4f9;
+        color: #333;
+    }
+
+    .hero {
+        background: linear-gradient(to right, #4b79a1, #283e51);
+        color: white;
+        padding: 4rem 2rem;
+        text-align: center;
+    }
+
+    .hero-content h1 {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .hero-content p {
+        font-size: 1.25rem;
+        margin-bottom: 2rem;
+    }
+
+    .hero-content button {
+        background-color: #ffb400;
+        border: none;
+        padding: 1rem 2rem;
+        font-size: 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .hero-content button:hover {
+        background-color: #e6a000;
+    }
+
+    .info-section {
+        max-width: 800px;
+        margin: 3rem auto;
+        padding: 0 2rem;
+        text-align: center;
+    }
+
+    .info-section h2 {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+
+    .info-section p {
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+    }
+
+    .info-section ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .info-section li {
+        padding: 0.5rem 0;
+        font-size: 1rem;
+    }
+    
+    .cta-section h2 {
+        margin-bottom: 1rem;
+    }
+
+    .cta-section button {
+        margin: 0 0.5rem;
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .cta-section button:hover {
+        background-color: #43a047;
+    }
+</style>
+
+@code {
+    private void GoToCards() => Navigation.NavigateTo("/cards");
+}

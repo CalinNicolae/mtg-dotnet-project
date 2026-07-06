@@ -1,0 +1,378 @@
+﻿@page "/cards"
+@using MTGProject.ModelDto
+@using MTGProject.Services
+@using Blazored.LocalStorage
+@inject CardService service
+@attribute [StreamRendering]
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject AuthService AuthService
+@inject ILocalStorageService LocalStorage
+@inject FilterLocalStorageService filterLocalStorage
+
+<h3>Magic: The Gathering Cards</h3>
+
+<div class="filter-container">
+    <input type="text" @bind="_searchTerm" @oninput="SearchCards" placeholder="Search for a card..." />
+   
+    <select @bind-value="_manaCostFilter" @bind-value:event="oninput" @bind-value:after="ApplyFilter">
+        <option value="">Converted Mana Cost</option>
+        @for (int i = 1; i <= 30; i++)
+        {
+            <option value="@i">@i</option>
+        }
+    </select>
+
+    <select @bind-value="_typeFilter" @bind-value:event="oninput" @bind-value:after="ApplyFilter">
+        <option value="">All Types</option>
+        @foreach (TypeDTO type in _types)
+        {
+            <option value="@type.Name">@type.Name</option>
+        }
+    </select>
+
+    <select @bind-value="_rarityFilter" @bind-value:event="oninput" @bind-value:after="ApplyFilter">
+        <option value="">All Rarities</option>
+        @foreach (RarityDTO rarity in _rarities)
+        {
+            <option value="@rarity.Code">@rarity.Name</option>
+        }
+    </select>
+
+    <select @bind-value="_colorFilter" @bind-value:event="oninput" @bind-value:after="ApplyFilter">
+        <option value="">All Colors</option>
+        @foreach (ColorDTO color in _colors)
+        {
+            <option value="@color.Code">@color.Name</option>
+        }
+    </select>
+
+    @if(HasFilters)
+    {
+        <button @onclick="ClearFilters" class="clear-btn">Clear Filters</button>
+    }
+</div>
+
+<CardPopup @ref="cardPopup"></CardPopup>
+
+@if (_isLoading)
+{
+    <p>Loading...</p>
+}
+else if (!_allCards.Any())
+{
+    <p>No cards found.</p>
+}
+else
+{
+    <div class="grid-container">
+        @foreach (CardDTO card in _allCards)
+        {
+            <div class="grid-item"
+                 @onclick="() => ShowCardDetails(card)">
+                <img src="@card.Image" alt="_" width="30" height="100">
+                <h5>@card.Name </h5>
+            </div>
+        }
+    </div>
+    @if(!HasFilters)
+    {
+        <button @onclick="LoadMoreCards" class="load-more-btn">Load More Cards</button>
+    }
+}
+
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f6f8;
+        margin: 0;
+        padding: 0;
+    }
+
+    h3 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #ffffff;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+        margin: 1rem auto;
+        letter-spacing: 0.5px;
+        padding: 0.5rem 1rem;
+        border-left: 5px solid #1e90ff;
+        background: linear-gradient(to right, #1e90ff, #00bfff);
+        border-radius: 8px;
+        display: inline-block;
+    }
+
+    .filter-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: center;
+        margin: 2rem auto;
+        max-width: 1000px;
+    }
+
+    input[type="text"],
+    select {
+        width: 220px;
+        padding: 10px 15px;
+        border: 1px solid #ccc;
+        border-radius: 12px;
+        font-size: 16px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+        background-color: #fff;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+        border-color: #0078d4;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.2);
+    }
+
+    .clear-btn {
+        background-color: #ff4d4d;
+        color: white;
+        padding: 10px 16px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .clear-btn:hover {
+        background-color: #cc0000;
+    }
+
+    .grid-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        padding: 2rem;
+        max-width: 1200px;
+        margin: auto;
+    }
+
+    .grid-item {
+        background-color: #fff;
+        padding: 1rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        transition: transform 0.2s ease, box-shadow 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        font-size: 14px;
+        cursor: pointer;
+        color: black;
+        text-align: center;
+    }
+
+    .grid-item:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    }
+
+    .grid-item img {
+        align-self: center;
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+        object-fit: contain;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+    }
+
+    .load-more-btn {
+        display: block;
+        margin: 2rem auto;
+        padding: 10px 24px;
+        background-color: #0078d4;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .load-more-btn:hover {
+        background-color: #005fa3;
+    }
+
+    .loading-text {
+        text-align: center;
+        font-size: 18px;
+        margin-top: 1rem;
+        color: #333;
+    }
+</style>
+
+
+
+@code {
+    private List<CardDTO> _allCards = [];
+    private List<TypeDTO> _types = [];
+    private List<RarityDTO> _rarities = [];
+    private List<ColorDTO> _colors = [];
+    private string _searchTerm = "";
+    private string _manaCostFilter = "";
+    private string _typeFilter = "";
+    private string _rarityFilter = "";
+    private string _colorFilter = "";
+    private bool _isLoading = true;
+    private int _pageNumber = 1;
+    private readonly int _pageSize = 20;
+    private bool _isSearching = false;
+    private bool _isFiltering = false;
+    private CardPopup cardPopup;
+    private const string STORAGE_KEY = "mtg_filters_cards";
+    private bool HasFilters =>
+        !string.IsNullOrEmpty(_searchTerm) ||
+        !string.IsNullOrEmpty(_manaCostFilter) ||
+        !string.IsNullOrEmpty(_typeFilter) ||
+        !string.IsNullOrEmpty(_rarityFilter) ||
+        !string.IsNullOrEmpty(_colorFilter);
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        await LoadFiltersFromStorage();
+    }
+    
+    private async Task LoadFiltersFromStorage()
+    {
+        FilterData filterData = await filterLocalStorage.LoadFiltersAsync(STORAGE_KEY);
+        if (filterData != null)
+        {
+            _searchTerm = filterData.SearchTerm;
+            _manaCostFilter = filterData.ManaCostFilter;
+            _typeFilter = filterData.TypeFilter;
+            _rarityFilter = filterData.RarityFilter;
+            _colorFilter = filterData.ColorFilter;
+        }
+    }
+    
+    private async Task SaveFiltersToStorage()
+    {
+        FilterData filterData = new FilterData
+        {
+            SearchTerm = _searchTerm,
+            ManaCostFilter = _manaCostFilter,
+            TypeFilter = _typeFilter,
+            RarityFilter = _rarityFilter,
+            ColorFilter = _colorFilter
+        };
+        await filterLocalStorage.SaveFiltersAsync(filterData, STORAGE_KEY);
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await AuthService.InitializeAuth();
+        
+        if (AuthService.IsAuthenticated)
+        {
+            _types = await service.GetTypes();
+            _rarities = await service.GetRarities();
+            _colors = await service.GetColors();
+            
+            if (HasFilters)
+            {
+                _isFiltering = true;
+                _isSearching = true;
+            }
+        
+            await FetchAllCardsAsync();
+        
+            _isLoading = false;
+            StateHasChanged();
+        }
+        else
+        {
+            Navigation.NavigateTo("/login");
+        }
+        _isLoading = false;
+    }
+    
+    private async Task LoadMoreCards()
+    {
+        _pageNumber++;
+        await FetchAllCardsAsync();
+    }
+    
+    private async Task FetchAllCardsAsync()
+    {
+        // No filters - regular pagination
+        if (!HasFilters)
+        {
+            if (_isSearching || _isFiltering)
+            {
+                _pageNumber = 1;
+                _allCards.Clear();
+                _isSearching = false;
+                _isFiltering = false;
+            }
+        
+            List<CardDTO> newCards = await service.GetAllCards(_pageNumber, _pageSize);
+        
+            // Only add new cards if this isn't the initial load, otherwise replace
+            if (_pageNumber == 1)
+                _allCards = newCards;
+            else
+                _allCards.AddRange(newCards);
+            return;
+        }
+        
+        // Apply filters
+        _isSearching = true;
+        _isFiltering = true;
+
+        _allCards = await service.SearchCards(
+            _searchTerm, 
+            _manaCostFilter, 
+            _typeFilter,
+            _rarityFilter,
+            _colorFilter,
+            _pageSize // maybe add larger page size for filtering?
+        );
+    }
+    
+    private async Task SearchCards(ChangeEventArgs e)
+    {
+        _searchTerm = e.Value?.ToString() ?? "";
+        await SaveFiltersToStorage();
+        await FetchAllCardsAsync();
+    }
+    
+    private async Task ClearFilters()
+    {
+        _searchTerm = "";
+        _manaCostFilter = "";
+        _typeFilter = "";
+        _rarityFilter = "";
+        _colorFilter = "";
+
+        await filterLocalStorage.ClearFiltersAsync();
+       await FetchAllCardsAsync();
+    }
+    
+    private async Task ApplyFilter()
+    {
+        _isFiltering = true;
+        await SaveFiltersToStorage();
+        await FetchAllCardsAsync();
+    }
+    
+    private async Task ShowCardDetails(CardDTO card)
+    {
+       await cardPopup.ShowPopup(card);
+    }
+    
+    
+}

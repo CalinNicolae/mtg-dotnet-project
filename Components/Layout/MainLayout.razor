@@ -1,0 +1,101 @@
+﻿@inherits LayoutComponentBase
+@using MTGProject.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu/>
+    </div>
+    <main>
+        <div class="top-row px-4" style="background:#07163C; color:#ffffff;">
+            <a href="https://deckbox.org/games/mtg/cards" target="_blank">About MTG</a>
+            @if (IsAuthenticated)
+            { 
+                <a @onclick="SignOut" target="_blank" style="cursor:pointer;">Sign out</a>
+         
+            }
+            else
+            {
+                <a @onclick="SignIn" target="_blank">Sign in</a>
+                <a @onclick="SignUp" target="_blank">Sign up</a>
+            }
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+<style>
+    .page {
+        background: linear-gradient(135deg, #1e90ff, #87ceeb, #ff7f50);
+        color: #ffffff;
+        background-size: 400% 400%;
+        animation: gradientAnimation 15s ease infinite;
+    }
+
+    @@keyframes gradientAnimation {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+</style>
+
+@code
+{
+    bool IsAuthenticated = false;
+    
+    protected override void OnInitialized()
+    {
+        // Subscribe to the authentication state change event
+        AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthService.InitializeAuth();
+            IsAuthenticated = AuthService.IsAuthenticated;
+            StateHasChanged();
+        }
+    }
+
+
+    protected async Task SignOut()
+    { 
+        await AuthService.LogoutAsync();
+    }
+    
+    protected async Task SignIn()
+    { 
+        Navigation.NavigateTo("/login");
+    }
+    
+    protected async Task SignUp()
+    { 
+        Navigation.NavigateTo("/signup");
+    }
+    
+    
+    private void OnAuthenticationStateChanged(object sender, EventArgs e)
+    {
+        // Update IsAuthenticated and refresh UI when auth state changes
+        IsAuthenticated = AuthService.IsAuthenticated;
+        InvokeAsync(StateHasChanged);
+    }
+    
+    public void Dispose()
+    {
+        // Unsubscribe from the event to prevent memory leaks
+        AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+    }
+}

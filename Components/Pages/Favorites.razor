@@ -1,0 +1,403 @@
+@page "/favorites"
+@using MTGProject.ModelDto
+@using MTGProject.Services
+@using Blazored.LocalStorage
+@inject CardService CardService
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject ILocalStorageService LocalStorage
+@inject FilterLocalStorageService filterLocalStorage
+@attribute [StreamRendering]
+@rendermode InteractiveServer
+
+
+<h3>Your Favorite Cards</h3>
+
+<div class="filter-container">
+    <input type="text" @bind="_searchTerm" @oninput="SearchCards" placeholder="Search for a card..." />
+   
+    <select @bind-value="_manaCostFilter" @bind-value:event="oninput" @bind-value:after="ApplyFilter">
+        <option value="">Converted Mana Cost</option>
+        @for (int i = 1; i <= 30; i++)
+        {
+            <option value="@i">@i</option>
+        }
+    </select>
+
+    <select @bind-value="_typeFilter" @bind-value:event="oninput" @bind-value:after="ApplyFilter">
+        <option value="">All Types</option>
+        @foreach (TypeDTO type in _types)
+        {
+            <option value="@type.Name">@type.Name</option>
+        }
+    </select>
+
+    <select @bind-value="_rarityFilter" @bind-value:event="oninput" @bind-value:after="ApplyFilter">
+        <option value="">All Rarities</option>
+        @foreach (RarityDTO rarity in _rarities)
+        {
+            <option value="@rarity.Code">@rarity.Name</option>
+        }
+    </select>
+
+    <select @bind-value="_colorFilter" @bind-value:event="oninput" @bind-value:after="ApplyFilter">
+        <option value="">All Colors</option>
+        @foreach (ColorDTO color in _colors)
+        {
+            <option value="@color.Code">@color.Name</option>
+        }
+    </select>
+
+    @if(HasFilters)
+    {
+        <button @onclick="ClearFilters" class="clear-btn">Clear Filters</button>
+    }
+</div>
+
+@if (_isLoading)
+{
+    <p>Loading your favorite cards...</p>
+}
+else if (_favoriteCards == null || !_favoriteCards.Any())
+{
+    <p>You have no favorite cards yet.</p>
+}
+else
+{
+    <div class="card-grid">
+        @foreach (var card in _favoriteCards)
+        {
+            <div class="card-item">
+                <img src="@card.Image" alt="@card.Name" />
+                <h5>@card.Name</h5>
+                <p><strong>Artist:</strong> @card.Artist</p>
+                <p><strong>Color:</strong> @card.Color</p>
+                <div class="card-buttons">
+                    <button class="view-button" @onclick="() => ShowCardDetails(card)">View</button>
+                    <button class="remove-button" @onclick="() => RemoveFromFavorites(card.Id)">Remove</button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<CardPopup @ref="cardPopup" OnClose="OnPopupClosed"></CardPopup>
+
+
+
+
+<style>
+    h3 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #ffffff;
+        background: linear-gradient(to right, #1e90ff, #00bfff);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        display: inline-block;
+    }
+
+    .filter-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: center;
+        margin: 2rem auto;
+        max-width: 1000px;
+    }
+
+    input[type="text"],
+    select {
+        width: 220px;
+        padding: 10px 15px;
+        border: 1px solid #ccc;
+        border-radius: 12px;
+        font-size: 16px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+        background-color: #fff;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+        border-color: #0078d4;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.2);
+    }
+
+    .clear-btn {
+        background-color: #ff4d4d;
+        color: white;
+        padding: 10px 16px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .clear-btn:hover {
+        background-color: #cc0000;
+    }
+
+    .card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        padding: 1rem;
+    }
+
+    .card-item {
+        background-color: #f9f9f9;
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .card-item:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-item img {
+        height: auto;
+        border-radius: 8px;
+        max-height: 200px;
+        object-fit: cover;
+        margin-bottom: 0.75rem;
+    }
+
+    .card-item h5 {
+        margin: 0.5rem 0 0.25rem;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .card-item p {
+        font-size: 0.95rem;
+        margin: 0.25rem 0;
+        color: #666;
+    }
+
+    .card-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .view-button {
+        background-color: #28a745;
+        color: white;
+        padding: 0.4rem 1rem;
+        font-size: 0.95rem;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .view-button:hover {
+        background-color: #218838;
+    }
+
+    .remove-button {
+        background-color: #ff4d4d;
+        color: white;
+        padding: 0.4rem 1rem;
+        font-size: 0.95rem;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .remove-button:hover {
+        background-color: #e60000;
+    }
+</style>
+
+
+@code {
+    private List<CardDTO> _favoriteCards = new();
+    private List<CardDTO> _allFavoriteCards = new();
+    private List<TypeDTO> _types = [];
+    private List<RarityDTO> _rarities = [];
+    private List<ColorDTO> _colors = [];
+    private bool _isLoading = true;
+    private CardPopup cardPopup;
+    private string _searchTerm = "";
+    private string _manaCostFilter = "";
+    private string _typeFilter = "";
+    private string _rarityFilter = "";
+    private string _colorFilter = "";
+    private bool _isSearching = false;
+    private bool _isFiltering = false;
+    private const string STORAGE_KEY = "mtg_filters_favorites";
+    
+    private bool HasFilters =>
+        !string.IsNullOrEmpty(_searchTerm) ||
+        !string.IsNullOrEmpty(_manaCostFilter) ||
+        !string.IsNullOrEmpty(_typeFilter) ||
+        !string.IsNullOrEmpty(_rarityFilter) ||
+        !string.IsNullOrEmpty(_colorFilter);
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        await LoadFiltersFromStorage();
+    }
+    
+    private async Task LoadFiltersFromStorage()
+    {
+        FilterData filterData = await filterLocalStorage.LoadFiltersAsync(STORAGE_KEY);
+        if (filterData != null)
+        {
+            _searchTerm = filterData.SearchTerm;
+            _manaCostFilter = filterData.ManaCostFilter;
+            _typeFilter = filterData.TypeFilter;
+            _rarityFilter = filterData.RarityFilter;
+            _colorFilter = filterData.ColorFilter;
+        }
+    }
+    
+    private async Task SaveFiltersToStorage()
+    {
+        FilterData filterData = new FilterData
+        {
+            SearchTerm = _searchTerm,
+            ManaCostFilter = _manaCostFilter,
+            TypeFilter = _typeFilter,
+            RarityFilter = _rarityFilter,
+            ColorFilter = _colorFilter
+        };
+        await filterLocalStorage.SaveFiltersAsync(filterData, STORAGE_KEY);
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthService.InitializeAuth();
+            if (AuthService.IsAuthenticated)
+            {
+                _types = await CardService.GetTypes();
+                _rarities = await CardService.GetRarities();
+                _colors = await CardService.GetColors();
+                
+                _isLoading = true;
+                _allFavoriteCards = await CardService.GetUserFavoriteCards(AuthService.Id);
+                await ApplyFilters();
+                _isLoading = false;
+                StateHasChanged();
+            }
+            else
+            {
+                Navigation.NavigateTo("/login");
+            }
+        }
+    }
+    
+    private async Task RemoveFromFavorites(long cardId)
+    {
+        bool success = await CardService.RemoveCardFromFavorites(AuthService.Id, cardId);
+        if (success)
+        {
+            _allFavoriteCards = _allFavoriteCards.Where(c => c.Id != cardId).ToList();
+            await ApplyFilters();
+        }
+    }
+    
+    private async Task ShowCardDetails(CardDTO card)
+    {
+        await cardPopup.ShowPopup(card);
+    }
+    
+    private async Task OnPopupClosed(bool wasRemoved)
+    {
+        if (wasRemoved)
+        {
+            _allFavoriteCards = await CardService.GetUserFavoriteCards(AuthService.Id);
+            await ApplyFilters();
+            StateHasChanged();
+        }
+    }
+    
+    private async Task SearchCards(ChangeEventArgs e)
+    {
+        _searchTerm = e.Value?.ToString() ?? "";
+        await SaveFiltersToStorage();
+        await ApplyFilters();
+    }
+    
+    private async Task ApplyFilter()
+    {
+        _isFiltering = true;
+        await SaveFiltersToStorage();
+        await ApplyFilters();
+    }
+    
+    private async Task ClearFilters()
+    {
+        _searchTerm = "";
+        _manaCostFilter = "";
+        _typeFilter = "";
+        _rarityFilter = "";
+        _colorFilter = "";
+
+        await filterLocalStorage.ClearFiltersAsync();
+        _favoriteCards = _allFavoriteCards;
+    }
+    
+    private async Task ApplyFilters()
+    {
+        if (!HasFilters)
+        {
+            _favoriteCards = _allFavoriteCards;
+            return;
+        }
+        
+        // Apply filters locally since we already have all favorite cards
+        IEnumerable<CardDTO> filteredCards = _allFavoriteCards;
+        
+        // Apply search filter
+        if (!string.IsNullOrEmpty(_searchTerm))
+        {
+            string normalizedSearch = _searchTerm.Trim().ToLower();
+            filteredCards = filteredCards.Where(c => c.Name.ToLower().Contains(normalizedSearch));
+        }
+        
+        // Apply mana cost filter
+        if (!string.IsNullOrEmpty(_manaCostFilter))
+        {
+            filteredCards = filteredCards.Where(c => c.ConvertedManaCost == _manaCostFilter);
+        }
+        
+        // Apply type filter
+        if (!string.IsNullOrEmpty(_typeFilter))
+        {
+            filteredCards = filteredCards.Where(c => c.Type != null && c.Type.Contains(_typeFilter));
+        }
+        
+        // Apply rarity filter
+        if (!string.IsNullOrEmpty(_rarityFilter))
+        {
+            filteredCards = filteredCards.Where(c => c.RarityCode == _rarityFilter);
+        }
+        
+        // Apply color filter
+        if (!string.IsNullOrEmpty(_colorFilter))
+        {
+            filteredCards = filteredCards.Where(c => c.Color != null && c.Color.Contains(_colorFilter));
+        }
+        
+        _favoriteCards = filteredCards.ToList();
+    }
+}
